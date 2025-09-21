@@ -34,8 +34,8 @@ export class Blockchain extends BlockchainUtils {
     this.rollbackManager = new RollbackManager(this.db);
 
     //genesis block hydration
-    this.hydrateGenesisBlock();
-    this.hydrateMockData();
+    // this.hydrateGenesisBlock();
+    // this.hydrateMockData();
   }
 
   hydrateGenesisBlock() {

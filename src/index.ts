@@ -89,7 +89,7 @@ async function bootstrap() {
 }
 
 try {
-  // await bootstrap();
+  await bootstrap();
   await fastify.listen({
     port: 3000,
     host: '0.0.0.0'
@@ -99,6 +99,4 @@ try {
   process.exit(1)
 };
 
-function sha256(arg0: string) {
-  throw new Error('Function not implemented.');
-}
+
