@@ -2,7 +2,7 @@ import type { Block, Output, Transaction } from "../types";
 import {BlockchainUtils} from "./blockchain-utils";
 
 export class BlockchainDB  extends BlockchainUtils {
-    utxoSet: Map<string, { output: Output; txId: string; index: number }>;
+    utxos: Map<string, { output: Output; txId: string; index: number }>;
 
     balanceCache: Map<string, number>;
 
@@ -14,7 +14,7 @@ export class BlockchainDB  extends BlockchainUtils {
 
     constructor() {
         super();
-        this.utxoSet = new Map();
+        this.utxos = new Map();
         this.balanceCache = new Map();
         this.transactions = new Map();
         this.balances = new Map<string, number>();
@@ -31,7 +31,7 @@ export class BlockchainDB  extends BlockchainUtils {
     }
 
     getUtxoItem(txId: string, index: number): { output: Output; txId: string; index: number } | undefined {
-        return this.utxoSet.get(this.getUtxoKey(txId, index));
+        return this.utxos.get(this.getUtxoKey(txId, index));
       }
 
 }

@@ -23,14 +23,14 @@ export class RollbackManager extends BlockchainUtils {
   processTransaction(transaction: Transaction): void {
     transaction.outputs.forEach((output, index) => {
       this.updateBalance(output.address, -output.value);
-      this.db.utxoSet.delete(this.getUtxoKey(transaction.id, index));
+      this.db.utxos.delete(this.getUtxoKey(transaction.id, index));
     });
 
     transaction.inputs.forEach((input) => {
       const tx = this.db.transactions.get(input.txId);
       const output = tx!.outputs[input.index];
       this.updateBalance(output.address, output.value);
-      this.db.utxoSet.set(this.getUtxoKey(input.txId, input.index), {
+      this.db.utxos.set(this.getUtxoKey(input.txId, input.index), {
         output,
         txId: input.txId,
         index: input.index,

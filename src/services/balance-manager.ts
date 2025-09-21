@@ -47,14 +47,14 @@ export class BalanceManager extends BlockchainUtils {
 
   private spendInput(input: Input): void {
     const utxoKey = this.getUtxoKey(input.txId, input.index);
-    const utxo = this.db.utxoSet.get(utxoKey);
+    const utxo = this.db.utxos.get(utxoKey);
 
     if (!utxo) {
       throw new Error(`Cannot spend input: UTXO ${utxoKey} not found`);
     }
 
     // Remove from UTXO set (mark as spent)
-    this.db.utxoSet.delete(utxoKey);
+    this.db.utxos.delete(utxoKey);
     
     // Update balance: subtract value from the address that owned this UTXO
     this.updateBalance(utxo.output.address, -utxo.output.value);
@@ -65,7 +65,7 @@ export class BalanceManager extends BlockchainUtils {
   private createOutput(transactionId: string, index: number, output: Output): void {
     const utxoKey = this.getUtxoKey(transactionId, index);
     
-    this.db.utxoSet.set(utxoKey, {
+    this.db.utxos.set(utxoKey, {
       output,
       txId: transactionId,
       index
@@ -91,7 +91,7 @@ export class BalanceManager extends BlockchainUtils {
   getUtxosForAddress(address: string): { txId: string; index: number; value: number }[] {
     const utxos: { txId: string; index: number; value: number }[] = [];
     
-    for (const [key, utxo] of this.db.utxoSet) {
+    for (const [key, utxo] of this.db.utxos) {
       if (utxo.output.address === address) {
         utxos.push({
           txId: utxo.txId,
@@ -107,7 +107,7 @@ export class BalanceManager extends BlockchainUtils {
  
   debugUtxos(): void {
     console.log('UTXO Set');
-    for (const [key, utxo] of this.db.utxoSet) {
+    for (const [key, utxo] of this.db.utxos) {
       console.log(`${key}: ${utxo.output.value} -> ${utxo.output.address}`);
     }
   }
