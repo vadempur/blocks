@@ -7,7 +7,7 @@ import { Blockchain } from './services/blockchain';
 const fastify = Fastify({ logger: true });
 
 fastify.get('/', async (request, reply) => {
-  return { hello: 'world' };
+  return blockchain.getData();
 });
 
 fastify.post('/hash', async (request, reply) => {
@@ -19,15 +19,10 @@ fastify.post('/hash', async (request, reply) => {
 const blockchain = new Blockchain();
 
 
-
-console.log(JSON.stringify(blockchain.blocks),"blockchain");
-
-
 fastify.post('/blocks', async (request, reply) => {
   try {
     const block: any = request.body;
     blockchain.addBlock(block);
-    console.log(blockchain.blocks,"addedblock");
     reply.header("Content-Type", "application/json");
     reply.send(blockchain);
   } catch (error) {
@@ -35,6 +30,19 @@ fastify.post('/blocks', async (request, reply) => {
   }
   
 });
+
+
+fastify.post('/rollback', async (request:any, reply) => {
+  try{
+    const height:number = request.body.height;
+    blockchain.rollbackManager.rollbackToHeight(height);
+    reply.header("Content-Type", "application/json");
+    reply.send(blockchain);
+  }catch(error){
+    reply.send(error);
+  }
+});
+  
 
 // async function testPostgres(pool: Pool) {
 //   // const id = randomUUID();
@@ -81,7 +89,7 @@ async function bootstrap() {
 }
 
 try {
-  await bootstrap();
+  // await bootstrap();
   await fastify.listen({
     port: 3000,
     host: '0.0.0.0'
