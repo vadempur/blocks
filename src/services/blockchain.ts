@@ -1,111 +1,117 @@
-import type { Transaction, Block, Output } from "../types";
+import type { TransactionType, BlockType } from "../types";
 import { BalanceManager } from "./balance-manager";
 import { BlockchainDB } from "./blockchain-db";
 import { RollbackManager } from "./rollback-manger";
 import { BlockchainUtils } from "./blockchain-utils";
-import { blocks } from "../blocks.data";
-
-const genesisBlock: Block = {
-  id: "0",
-  height: 1,
-  transactions: [
-    {
-      id: "tx1",
-      inputs: [],
-      outputs: [
-        {
-          address: "add-shashi",
-          value: 100,
-        },
-      ],
-    },
-  ],
-};
+import {
+  InvalidHeightError,
+  InvalidTransactionSumError,
+  GenesisBlockExistsError,
+} from "../errors";
 
 export class Blockchain extends BlockchainUtils {
   private db: BlockchainDB;
   balanceManager: BalanceManager;
   rollbackManager: RollbackManager;
 
-  constructor() {
+  constructor(
+    db?: BlockchainDB,
+    balanceManager?: BalanceManager,
+    rollbackManager?: RollbackManager
+  ) {
     super();
-    this.db = new BlockchainDB();
-    this.balanceManager = new BalanceManager(this.db);
-    this.rollbackManager = new RollbackManager(this.db);
+    this.db = db || new BlockchainDB();
+    this.balanceManager = balanceManager || new BalanceManager(this.db);
+    this.rollbackManager = rollbackManager || new RollbackManager(this.db);
 
     //genesis block hydration
     // this.hydrateGenesisBlock();
     // this.hydrateMockData();
   }
 
-  hydrateGenesisBlock() {
-    this.db.hydrate(genesisBlock);
-    this.balanceManager.hydrate(genesisBlock);
-  }
+  // hydrateGenesisBlock() {
+  //   this.db.hydrate(genesisBlock);
+  //   this.balanceManager.hydrate(genesisBlock);
+  // }
 
-  hydrateMockData() {
-    blocks.forEach((block) => this.addBlock(block));
-  }
+  // hydrateMockData() {
+  //   blocks.forEach((block) => this.addBlock(block));
+  // }
 
-  getData() {
-    return {
-      balance: Object.fromEntries(this.db.balanceCache),
-      blocks: this.db.blocks,
-    };
-  }
+  // getData() {
+  //   return {
+  //     // balance: Object.fromEntries(this.db.balanceCache),
+  //     blocks: this.db.blocks,
+  //   };
+  // }
 
-  addBlock(block: Block) {
+  async addBlock(block: BlockType) {
     if (block.height === 1) {
       return this.addGenesisBlock(block);
     }
 
-    if (!this.validateHeight(block.height)) {
-      throw new Error("Invalid block height");
+    const currentHeight = await this.db.blocksRepo.count();
+    if (block.height !== currentHeight + 1) {
+      throw new InvalidHeightError(currentHeight + 1, block.height);
     }
 
-    const validTransactions = block.transactions.map((transaction) =>
-      this.validateTransaction(transaction)
+    const validTransactions = await Promise.all(
+      block.transactions.map((transaction) =>
+        this.validateTransaction(transaction)
+      )
     );
 
     const hasInvalidTransactions = validTransactions.some((result) => !result);
 
     if (hasInvalidTransactions) {
-      throw new Error("Invalid transaction");
+      for (const transaction of block.transactions) {
+        const isValid = await this.validateTransaction(transaction);
+        if (!isValid) {
+          throw new InvalidTransactionSumError(transaction.id);
+        }
+      }
     }
 
     if (!this.validateBlockId(block)) {
       throw new Error("Invalid block id");
     }
 
-    block.transactions.forEach((transaction) => {
-      this.balanceManager.processTransaction(transaction);
-    });
+    await Promise.all(
+      block.transactions.map((transaction) =>
+        this.balanceManager.processTransaction(transaction)
+      )
+    );
 
-    this.db.blocks.push(block);
-    return {
-      blocks: this.db.blocks,
-    };
+    const blocks = await this.db.blocksRepo.set(block.id, block);
+    const latestBlock = await this.db.blocksRepo.getMaxHeightBlock();
+    return latestBlock || block;
   }
 
-  validateHeight(height: number) {
-    console.log(height, "height");
-
-    return height === this.db.blocks.length + 1;
+  async validateHeight(height: number) {
+    return height === (await this.db.blocksRepo.count()) + 1;
   }
 
-  validateTransaction(transaction: Transaction) {
+  async validateTransaction(transaction: TransactionType) {
     let inputAmount = 0;
     let outputAmount = 0;
 
-    transaction.inputs.forEach((input) => {
-      const utxo = this.db.getUtxoItem(input.txId, input.index);
+    if (transaction.inputs.length === 0) {
+      return true;
+    }
+
+    for (const input of transaction.inputs) {
+      const utxo = await this.db.getUtxoItem(input.txId, input.index);
 
       if (!utxo) {
-        throw new Error("Invalid input");
+        return false;
       }
 
-      inputAmount += utxo.output.value;
-    });
+      const inputValue =
+        typeof utxo.output.value === "string"
+          ? parseFloat(utxo.output.value)
+          : utxo.output.value;
+      inputAmount += inputValue;
+    }
 
     transaction.outputs.forEach((output) => {
       outputAmount += output.value;
@@ -114,27 +120,39 @@ export class Blockchain extends BlockchainUtils {
     return inputAmount === outputAmount;
   }
 
-  validateBlockId(block: Block) {
-    return block.id === this.getHash(block);
+  validateBlockId(block: BlockType) {
+    return block.id === this.getBlockHash(block);
   }
 
-  addGenesisBlock(block: Block) {
-    if (this.db.maxHeight) {
-      throw new Error("Genesis block already exists");
+  async addGenesisBlock(block: BlockType) {
+    if ((await this.db.blocksRepo.count()) > 0) {
+      throw new GenesisBlockExistsError();
     }
 
     if (!this.validateBlockId(block)) {
       throw new Error("Invalid block id");
     }
 
-    block.transactions.forEach((transaction) => {
-      this.balanceManager.processTransaction(transaction);
-    });
+    await Promise.all(
+      block.transactions.map((transaction) =>
+        this.balanceManager.processTransaction(transaction)
+      )
+    );
 
-    this.db.blocks.push(block);
+    await this.db.blocksRepo.set(block.id, block);
+    const latestBlock = await this.db.blocksRepo.getMaxHeightBlock();
+    return latestBlock || block;
+  }
 
-    return {
-      blocks: this.db.blocks,
-    };
+  async getBalance(address: string) {
+    return { balance: await this.db.getBalance(address) };
+  }
+
+  async getBlocksCount() {
+    return this.db.blocksRepo.count();
+  }
+
+  async getBlocks() {
+    return this.db.blocksRepo.getAll();
   }
 }

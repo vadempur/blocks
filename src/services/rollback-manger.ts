@@ -1,49 +1,77 @@
-import type { Output, Transaction } from "../types";
-import type {BlockchainDB} from "./blockchain-db";
-import {BlockchainUtils} from "./blockchain-utils";
+import type { TransactionType } from "../types";
+import type { BlockchainDB } from "./blockchain-db";
+import { BlockchainUtils } from "./blockchain-utils";
+import {
+  InvalidRollbackHeightError,
+  RollbackBelowGenesisError,
+} from "../errors";
 
 export class RollbackManager extends BlockchainUtils {
   constructor(private db: BlockchainDB) {
     super();
   }
 
-  rollbackToHeight(height: number) {
-    if (height >= this.db.maxHeight) {
-      throw new Error("Invalid height");
+  async rollbackToHeight(height: number) {
+    let maxHeight = await this.db.blocksRepo.getMaxHeight();
+
+    if (height >= maxHeight) {
+      throw new InvalidRollbackHeightError(height, maxHeight);
     }
 
-    while (this.db.maxHeight > height) {
-      const block = this.db.blocks.pop();
-      block!.transactions.forEach((transaction) => {
-        this.processTransaction(transaction);
-      });
+    if (height < 1) {
+      throw new RollbackBelowGenesisError();
+    }
+
+    while (maxHeight > height) {
+      const block = await this.db.blocksRepo.getMaxHeightBlock();
+      if (!block) break;
+
+      for (const tx of block.transactions.reverse()) {
+        await this.processTransaction(tx);
+      }
+
+      await this.db.blocksRepo.delete(block.id);
+
+      maxHeight--;
     }
   }
 
-  processTransaction(transaction: Transaction): void {
-    transaction.outputs.forEach((output, index) => {
-      this.updateBalance(output.address, -output.value);
-      this.db.utxos.delete(this.getUtxoKey(transaction.id, index));
-    });
+  async processTransaction(transaction: TransactionType): Promise<void> {
+    if (transaction.outputs && transaction.outputs.length > 0) {
+      await Promise.all(
+        transaction.outputs.map((output) =>
+          this.updateBalance(output.address, -output.value)
+        )
+      );
+    }
 
-    transaction.inputs.forEach((input) => {
-      const tx = this.db.transactions.get(input.txId);
-      const output = tx!.outputs[input.index];
-      this.updateBalance(output.address, output.value);
-      this.db.utxos.set(this.getUtxoKey(input.txId, input.index), {
-        output,
-        txId: input.txId,
-        index: input.index,
-      });
-    });
+    if (transaction.inputs && transaction.inputs.length > 0) {
+      for (const input of transaction.inputs) {
+        const tx = await this.db.transactionsRepo.get(input.txId);
+        if (!tx) throw new Error(`Transaction not found: ${input.txId}`);
+        if (!tx.outputs || !tx.outputs[input.index]) {
+          throw new Error(`Output not found: ${input.txId}:${input.index}`);
+        }
 
-    this.db.transactions.delete(transaction.id);
+        const output = tx.outputs[input.index];
+        await this.updateBalance(output.address, output.value);
+
+        await this.db.utxoRepo.set(this.getUtxoKey(input.txId, input.index), {
+          output,
+          txId: input.txId,
+          index: input.index,
+        });
+      }
+    }
   }
 
-  updateBalance(address: string, delta: number): void {
-    const currentBalance = this.db.balanceCache.get(address) || 0;
+  async updateBalance(address: string, delta: number): Promise<void> {
+    const record = await this.db.balanceRepo.get(address);
+    const currentBalance = record ? record.balance : 0;
     const newBalance = currentBalance + delta;
-    this.db.balanceCache.set(address, newBalance);
+    await this.db.balanceRepo.set(address, {
+      balance: newBalance,
+      address: address,
+    });
   }
 }
-

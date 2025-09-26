@@ -1,122 +1,85 @@
-import type { Output, Input, Transaction, Block } from "../types";
-import type {BlockchainDB} from "./blockchain-db";
-import {BlockchainUtils} from "./blockchain-utils";
-
+import type { Output, Input, TransactionType, BlockType } from "../types";
+import type { BlockchainDB } from "./blockchain-db";
+import { BlockchainUtils } from "./blockchain-utils";
 
 export class BalanceManager extends BlockchainUtils {
-
-
-  constructor(private db:BlockchainDB) {
+  constructor(private db: BlockchainDB) {
     super();
   }
 
-  hydrate(genesisBlock: Block){
+  hydrate(genesisBlock: BlockType) {
     genesisBlock.transactions.forEach((transaction) => {
-      this.processTransaction(transaction);
+      void this.processTransaction(transaction);
     });
   }
 
-
-  processTransaction(transaction: Transaction): void {
-    console.log(`Processing transaction: ${transaction.id}`);
-
+  async processTransaction(transaction: TransactionType): Promise<void> {
     if (transaction.inputs.length === 0) {
-      // Coinbase transaction: only create outputs
-      this.handleOutputs(transaction.id, transaction.outputs);
+      await this.handleOutputs(transaction.id, transaction.outputs);
     } else {
-      // Regular transaction: spend inputs and create outputs
-      this.handleInputs(transaction.inputs);
-      this.handleOutputs(transaction.id, transaction.outputs);
+      transaction.inputs.forEach((input, index) => {
+        input.id = `${transaction.id}:${index}`;
+      });
+      await this.handleInputs(transaction.inputs);
+      await this.handleOutputs(transaction.id, transaction.outputs);
     }
 
-    this.db.transactions.set(transaction.id, transaction);
-
+    await this.db.transactionsRepo.set(transaction.id, transaction);
   }
 
-  private handleInputs(inputs: Input[]): void {
+  private async handleInputs(inputs: Input[]): Promise<void> {
     for (const input of inputs) {
-      this.spendInput(input);
+      await this.spendInput(input);
     }
   }
 
-  private handleOutputs(transactionId: string, outputs: Output[]): void {
-    outputs.forEach((output, index) => {
-      this.createOutput(transactionId, index, output);
-    });
+  private async handleOutputs(
+    transactionId: string,
+    outputs: Output[]
+  ): Promise<void> {
+    for (const [index, output] of outputs.entries()) {
+      await this.createOutput(transactionId, index, output);
+    }
   }
 
-  private spendInput(input: Input): void {
+  private async spendInput(input: Input): Promise<void> {
     const utxoKey = this.getUtxoKey(input.txId, input.index);
-    const utxo = this.db.utxos.get(utxoKey);
+    const utxo = await this.db.utxoRepo.get(utxoKey);
 
     if (!utxo) {
       throw new Error(`Cannot spend input: UTXO ${utxoKey} not found`);
     }
 
-    // Remove from UTXO set (mark as spent)
-    this.db.utxos.delete(utxoKey);
-    
-    // Update balance: subtract value from the address that owned this UTXO
-    this.updateBalance(utxo.output.address, -utxo.output.value);
-    
-    console.log(`Spent ${utxo.output.value} from ${utxo.output.address}`);
+    await this.db.utxoRepo.delete(utxoKey);
+
+    await this.updateBalance(utxo.output.address, -utxo.output.value);
   }
 
-  private createOutput(transactionId: string, index: number, output: Output): void {
+  private async createOutput(
+    transactionId: string,
+    index: number,
+    output: Output
+  ): Promise<void> {
     const utxoKey = this.getUtxoKey(transactionId, index);
-    
-    this.db.utxos.set(utxoKey, {
+
+    await this.db.utxoRepo.set(utxoKey, {
       output,
       txId: transactionId,
-      index
+      index,
     });
-    
-    this.updateBalance(output.address, output.value);
-    
-    console.log(`Created output: ${output.value} to ${output.address}`);
+
+    await this.updateBalance(output.address, output.value);
   }
 
-
-  private updateBalance(address: string, delta: number): void {
-    const currentBalance = this.db.balanceCache.get(address) || 0;
-    const newBalance = currentBalance + delta;    
-    this.db.balanceCache.set(address, newBalance);
+  private async updateBalance(address: string, delta: number): Promise<void> {
+    const record = await this.db.balanceRepo.get(address);
+    const currentBalance = record ? record.balance : 0;
+    const newBalance = currentBalance + delta;
+    await this.db.balanceRepo.set(address, { balance: newBalance, address });
   }
 
-  getBalance(address: string): number {
-    return this.db.balanceCache.get(address) || 0;
+  async getBalance(address: string): Promise<number> {
+    const record = await this.db.balanceRepo.get(address);
+    return record ? record.balance : 0;
   }
-
-
-  getUtxosForAddress(address: string): { txId: string; index: number; value: number }[] {
-    const utxos: { txId: string; index: number; value: number }[] = [];
-    
-    for (const [key, utxo] of this.db.utxos) {
-      if (utxo.output.address === address) {
-        utxos.push({
-          txId: utxo.txId,
-          index: utxo.index,
-          value: utxo.output.value
-        });
-      }
-    }
-    
-    return utxos;
-  }
-
- 
-  debugUtxos(): void {
-    console.log('UTXO Set');
-    for (const [key, utxo] of this.db.utxos) {
-      console.log(`${key}: ${utxo.output.value} -> ${utxo.output.address}`);
-    }
-  }
-
-  debugBalances(): void {
-    console.log('Balances');
-    for (const [address, balance] of this.db.balanceCache) {
-      console.log(`${address}: ${balance}`);
-    }
-  }
-
 }

@@ -44,8 +44,14 @@ export class BlocksRepo extends Repository<BlockType> {
       height: entity.height,
       transactions: entity.transactions.map((tx: any) => ({
         id: tx.id,
-        inputs: tx.inputs || [],
-        outputs: tx.outputs || []
+        inputs: tx.inputs.map((input: any) => ({
+          txId: input.txId,
+          index: input.index
+        })),
+        outputs: tx.outputs.map((output: any) => ({
+          address: output.address,
+          value: output.value
+        }))
       }))
     };
   }

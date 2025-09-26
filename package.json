@@ -4,11 +4,16 @@
   "type": "module",
   "scripts": {
     "start": "npx bun src/index.ts",
-    "run-docker": "docker-compose up -d --build"
+    "test:unit": "vitest run",
+    "test:integration": "npx bun src/integration-tests.ts",
+    "run-docker": "docker-compose up -d --build",
+    "dev": "npx bun --watch src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/pg": "^8.11.8"
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.8",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

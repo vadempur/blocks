@@ -1,0 +1,121 @@
+{
+	"info": {
+		"_postman_id": "dc6cb217-79c0-4e60-852d-9c169a44d1ae",
+		"name": "New Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "16782958",
+		"_collection_link": "https://project-2848.postman.co/workspace/test~9e42804a-cd78-49fe-8025-915d8dbe4e1e/collection/16782958-dc6cb217-79c0-4e60-852d-9c169a44d1ae?action=share&source=collection_link&creator=16782958"
+	},
+	"item": [
+		{
+			"name": "block",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/block",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"block"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "hash",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/block",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"block"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "rollback",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"height\":2\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/rollback",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"rollback"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "balance",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/balances/addr1",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"balances",
+						"addr1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "allblocks",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}",
+					"host": [
+						"{{baseUrl}}"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
