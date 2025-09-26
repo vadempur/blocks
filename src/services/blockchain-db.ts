@@ -1,38 +1,55 @@
-import type { Block, Output, Transaction } from "../types";
-import {BlockchainUtils} from "./blockchain-utils";
+import type { BlockType, Output, TransactionType, UTXO } from "../types";
+import { BlockchainUtils } from "./blockchain-utils";
+import { UTXORepo } from "../db/repos/utxo.repo";
+import { BalanceRepo } from "../db/repos/balance.repo";
+import { BlocksRepo } from "../db/repos/blocks.repo";
+import { TransactionRepo } from "../db/repos/transaction.repo";
+import { InputRepo } from "../db/repos/input.repo";
+import { OutputRepo } from "../db/repos/output.repo";
 
-export class BlockchainDB  extends BlockchainUtils {
-    utxos: Map<string, { output: Output; txId: string; index: number }>;
+export class BlockchainDB extends BlockchainUtils {
+  readonly utxoRepo;
+  readonly balanceRepo;
+  readonly blocksRepo;
+  readonly transactionsRepo;
+  readonly inputRepo;
+  readonly outputRepo;
 
-    balanceCache: Map<string, number>;
+  // blocks: BlockType[];
 
-    transactions: Map<string, Transaction>;
+  constructor(
+    utxoRepo?: any,
+    balanceRepo?: any,
+    blocksRepo?: any,
+    transactionsRepo?: any,
+    inputRepo?: any,
+    outputRepo?: any
+  ) {
+    super();
+    this.utxoRepo = utxoRepo !== undefined ? utxoRepo : new UTXORepo();
+    this.balanceRepo =
+      balanceRepo !== undefined ? balanceRepo : new BalanceRepo();
+    this.blocksRepo = blocksRepo !== undefined ? blocksRepo : new BlocksRepo();
+    this.transactionsRepo =
+      transactionsRepo !== undefined ? transactionsRepo : new TransactionRepo();
+    this.inputRepo = inputRepo !== undefined ? inputRepo : new InputRepo();
+    this.outputRepo = outputRepo !== undefined ? outputRepo : new OutputRepo();
+  }
 
-    blocks: Block[];
+  // hydrate(genesisBlock: BlockType){
+  //     this.blocks = [genesisBlock];
+  // }
 
-    balances = new Map<string, number>();
+  async maxHeight(): Promise<number> {
+    return await this.blocksRepo.count();
+  }
 
-    constructor() {
-        super();
-        this.utxos = new Map();
-        this.balanceCache = new Map();
-        this.transactions = new Map();
-        this.balances = new Map<string, number>();
-        this.blocks = [];
-        
-    }
+  async getUtxoItem(txId: string, index: number): Promise<UTXO | undefined> {
+    return this.utxoRepo.get(this.getUtxoKey(txId, index));
+  }
 
-    hydrate(genesisBlock: Block){
-        this.blocks = [genesisBlock];
-    }
-
-    get maxHeight(){
-        return this.blocks.length;
-    }
-
-    getUtxoItem(txId: string, index: number): { output: Output; txId: string; index: number } | undefined {
-        return this.utxos.get(this.getUtxoKey(txId, index));
-      }
-
+  async getBalance(address: string): Promise<number | undefined> {
+    const balance = await this.balanceRepo.get(address);
+    return balance ? balance.balance : 0;
+  }
 }
-

@@ -1,11 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryColumn, Column } from 'typeorm';
 
 @Entity()
 export class Balance {
-  @PrimaryGeneratedColumn()
-  id!: number;
-
-  @Column()
+  @PrimaryColumn()
   address!: string;
 
   @Column('float')

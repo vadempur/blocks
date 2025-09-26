@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, PrimaryColumn } from 'typeorm';
 import { Transaction } from './Transaction';
 
 @Entity()
 export class Block {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryColumn('varchar', { length: 64 })
+  id!: string;
 
   @Column()
   height!: number;

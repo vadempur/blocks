@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Transaction } from './Transaction';
+import { Entity, PrimaryColumn, Column, ManyToOne } from 'typeorm';
+import type { Transaction } from './Transaction';
 
 @Entity()
 export class Input {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryColumn('varchar')
+  id!: string;
 
   @Column()
   txId!: string;
@@ -12,6 +12,6 @@ export class Input {
   @Column()
   index!: number;
 
-  @ManyToOne(() => Transaction, tx => tx.inputs)
+  @ManyToOne('Transaction', (tx: Transaction) => tx.inputs, { onDelete: 'CASCADE' })
   transaction!: Transaction;
 }

@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Transaction } from './Transaction';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import type { Transaction } from './Transaction';
 
 @Entity()
 export class Output {
@@ -9,9 +9,13 @@ export class Output {
   @Column()
   address!: string;
 
-  @Column('float')
+  @Column('decimal', { precision: 20, scale: 8 })
   value!: number;
 
-  @ManyToOne(() => Transaction, tx => tx.outputs)
+  @Column({ name: 'transactionId' })
+  transactionId!: string;
+
+  @ManyToOne('Transaction', (transaction: Transaction) => transaction.outputs, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'transactionId' })
   transaction!: Transaction;
 }
